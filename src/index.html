@@ -1,0 +1,832 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Hand Mouse Control</title>
+        <style>
+            @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+
+            :root {
+                --bg: #0a0a0f;
+                --surface: #12121a;
+                --surface2: #1a1a26;
+                --border: #2a2a3a;
+                --accent: #00e5a0;
+                --accent-dim: #00e5a022;
+                --danger: #ff4466;
+                --warn: #ffaa00;
+                --text: #e8e8f0;
+                --text-dim: #6a6a8a;
+                --radius: 12px;
+            }
+
+            body {
+                font-family: 'Space Grotesk', sans-serif;
+                background: var(--bg);
+                color: var(--text);
+                height: 100vh;
+                overflow: hidden;
+                user-select: none;
+            }
+
+            /* ─── Header ─── */
+            .header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 14px 18px;
+                border-bottom: 1px solid var(--border);
+                background: var(--surface);
+            }
+            .header h1 {
+                font-size: 14px;
+                font-weight: 600;
+                letter-spacing: 0.5px;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+            .header h1 .dot {
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background: var(--text-dim);
+                transition: background 0.3s;
+            }
+            .header h1 .dot.active {
+                background: var(--accent);
+                box-shadow: 0 0 8px var(--accent);
+            }
+
+            .toggle-btn {
+                padding: 6px 16px;
+                border: 1px solid var(--border);
+                border-radius: 20px;
+                background: transparent;
+                color: var(--text);
+                font-family: inherit;
+                font-size: 12px;
+                font-weight: 500;
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+            .toggle-btn:hover {
+                border-color: var(--accent);
+                color: var(--accent);
+            }
+            .toggle-btn.active {
+                background: var(--accent);
+                color: var(--bg);
+                border-color: var(--accent);
+            }
+
+            /* ─── Camera View ─── */
+            .camera-container {
+                position: relative;
+                width: 100%;
+                aspect-ratio: 4/3;
+                background: #000;
+                overflow: hidden;
+            }
+            #videoElement {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                transform: scaleX(-1);
+            }
+            #canvasOverlay {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                pointer-events: none;
+            }
+            .camera-badge {
+                position: absolute;
+                top: 10px;
+                left: 10px;
+                padding: 4px 10px;
+                background: rgba(0, 0, 0, 0.7);
+                border-radius: 6px;
+                font-size: 11px;
+                font-family: 'JetBrains Mono', monospace;
+                color: var(--accent);
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+            .camera-badge .rec {
+                width: 6px;
+                height: 6px;
+                border-radius: 50%;
+                background: var(--danger);
+                animation: blink 1s infinite;
+            }
+            @keyframes blink {
+                0%,
+                100% {
+                    opacity: 1;
+                }
+                50% {
+                    opacity: 0.3;
+                }
+            }
+
+            .fps-badge {
+                position: absolute;
+                top: 10px;
+                right: 10px;
+                padding: 4px 10px;
+                background: rgba(0, 0, 0, 0.7);
+                border-radius: 6px;
+                font-size: 11px;
+                font-family: 'JetBrains Mono', monospace;
+                color: var(--text-dim);
+            }
+
+            /* ─── Status Panel ─── */
+            .status-panel {
+                padding: 14px 18px;
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .gesture-grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 8px;
+            }
+
+            .gesture-card {
+                background: var(--surface);
+                border: 1px solid var(--border);
+                border-radius: var(--radius);
+                padding: 10px 12px;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                transition: all 0.2s;
+            }
+            .gesture-card.active {
+                border-color: var(--accent);
+                background: var(--accent-dim);
+            }
+            .gesture-card .icon {
+                font-size: 20px;
+                width: 32px;
+                text-align: center;
+                flex-shrink: 0;
+            }
+            .gesture-card .info {
+                display: flex;
+                flex-direction: column;
+            }
+            .gesture-card .label {
+                font-size: 11px;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                color: var(--text);
+            }
+            .gesture-card .desc {
+                font-size: 10px;
+                color: var(--text-dim);
+                margin-top: 1px;
+            }
+
+            /* ─── Settings ─── */
+            .settings {
+                padding: 0 18px 14px;
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .setting-row {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                background: var(--surface);
+                border: 1px solid var(--border);
+                border-radius: var(--radius);
+                padding: 10px 14px;
+            }
+            .setting-row .setting-label {
+                font-size: 12px;
+                font-weight: 500;
+            }
+            .setting-row input[type='range'] {
+                width: 120px;
+                accent-color: var(--accent);
+            }
+            .setting-row .setting-value {
+                font-family: 'JetBrains Mono', monospace;
+                font-size: 11px;
+                color: var(--accent);
+                min-width: 28px;
+                text-align: right;
+            }
+
+            /* ─── Log ─── */
+            .log-panel {
+                margin: 0 18px;
+                padding: 10px 14px;
+                background: var(--surface);
+                border: 1px solid var(--border);
+                border-radius: var(--radius);
+                max-height: 80px;
+                overflow-y: auto;
+                font-family: 'JetBrains Mono', monospace;
+                font-size: 10px;
+                color: var(--text-dim);
+                line-height: 1.6;
+            }
+            .log-panel .log-accent {
+                color: var(--accent);
+            }
+            .log-panel .log-warn {
+                color: var(--warn);
+            }
+
+            /* ─── Scrollbar ─── */
+            ::-webkit-scrollbar {
+                width: 4px;
+            }
+            ::-webkit-scrollbar-track {
+                background: transparent;
+            }
+            ::-webkit-scrollbar-thumb {
+                background: var(--border);
+                border-radius: 4px;
+            }
+        </style>
+    </head>
+    <body>
+        <!-- Header -->
+        <div class="header">
+            <h1>
+                <span class="dot" id="statusDot"></span>
+                HAND MOUSE
+            </h1>
+            <button
+                class="toggle-btn"
+                id="toggleBtn"
+                onclick="toggleTracking()"
+            >
+                START
+            </button>
+        </div>
+
+        <!-- Camera -->
+        <div class="camera-container">
+            <video id="videoElement" autoplay playsinline></video>
+            <canvas id="canvasOverlay"></canvas>
+            <div class="camera-badge">
+                <span class="rec" id="recDot" style="display: none"></span>
+                <span id="camStatus">CAMERA OFF</span>
+            </div>
+            <div class="fps-badge" id="fpsBadge">-- FPS</div>
+        </div>
+
+        <!-- Gesture Status -->
+        <div class="status-panel">
+            <div class="gesture-grid">
+                <div class="gesture-card" id="gestureMove">
+                    <span class="icon">🖐️</span>
+                    <div class="info">
+                        <span class="label">Move</span>
+                        <span class="desc">Palm tracking</span>
+                    </div>
+                </div>
+                <div class="gesture-card" id="gestureLeft">
+                    <span class="icon">👆</span>
+                    <div class="info">
+                        <span class="label">Left Click</span>
+                        <span class="desc">Thumb + Index</span>
+                    </div>
+                </div>
+                <div class="gesture-card" id="gestureRight">
+                    <span class="icon">👌</span>
+                    <div class="info">
+                        <span class="label">Right Click</span>
+                        <span class="desc">Thumb + Middle</span>
+                    </div>
+                </div>
+                <div class="gesture-card" id="gestureScroll">
+                    <span class="icon">📜</span>
+                    <div class="info">
+                        <span class="label">Scroll</span>
+                        <span class="desc">Thumb + Ring</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings -->
+        <div class="settings">
+            <div class="setting-row">
+                <span class="setting-label">Sensitivity</span>
+                <input
+                    type="range"
+                    id="sensitivity"
+                    min="1"
+                    max="5"
+                    step="0.5"
+                    value="2"
+                    oninput="updateSetting(this)"
+                />
+                <span class="setting-value" id="sensitivityVal">2.0</span>
+            </div>
+            <div class="setting-row">
+                <span class="setting-label">Smoothing</span>
+                <input
+                    type="range"
+                    id="smoothing"
+                    min="1"
+                    max="10"
+                    step="1"
+                    value="5"
+                    oninput="updateSetting(this)"
+                />
+                <span class="setting-value" id="smoothingVal">5</span>
+            </div>
+            <div class="setting-row">
+                <span class="setting-label">Pinch Threshold</span>
+                <input
+                    type="range"
+                    id="threshold"
+                    min="20"
+                    max="80"
+                    step="5"
+                    value="45"
+                    oninput="updateSetting(this)"
+                />
+                <span class="setting-value" id="thresholdVal">45</span>
+            </div>
+        </div>
+
+        <!-- Log -->
+        <div class="log-panel" id="logPanel">
+            <div>[ SYSTEM ] Hand Mouse Control v1.0 ready</div>
+        </div>
+
+        <!-- ─── MediaPipe Hands via CDN ─── -->
+        <script
+            src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"
+            crossorigin="anonymous"
+        ></script>
+        <script
+            src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"
+            crossorigin="anonymous"
+        ></script>
+        <script
+            src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"
+            crossorigin="anonymous"
+        ></script>
+
+        <script>
+            // ══════════════════════════════════════════════════════════════
+            //  CONFIGURATION & STATE
+            // ══════════════════════════════════════════════════════════════
+
+            let isTracking = false;
+            let screenW = 1920,
+                screenH = 1080;
+            let camera = null;
+
+            // Smoothing buffers
+            let smoothX = 0,
+                smoothY = 0;
+            let prevPalmX = null,
+                prevPalmY = null;
+
+            // Gesture states
+            let isLeftDown = false;
+            let rightClickCooldown = false;
+            let isScrolling = false;
+            let scrollBaseY = 0;
+
+            // FPS tracking
+            let frameCount = 0,
+                lastFpsTime = performance.now();
+
+            // Settings
+            let sensitivity = 2.0;
+            let smoothingFactor = 5;
+            let pinchThreshold = 45;
+
+            // ── Get screen size from main process ──
+            window.mouseAPI.onScreenSize((data) => {
+                screenW = data.width;
+                screenH = data.height;
+                log('Screen detected: ' + screenW + '×' + screenH, 'accent');
+            });
+            window.mouseAPI.getScreenSize().then((size) => {
+                screenW = size.width;
+                screenH = size.height;
+            });
+
+            // ══════════════════════════════════════════════════════════════
+            //  MEDIAPIPE HANDS SETUP
+            // ══════════════════════════════════════════════════════════════
+
+            const videoElement = document.getElementById('videoElement');
+            const canvasOverlay = document.getElementById('canvasOverlay');
+            const ctx = canvasOverlay.getContext('2d');
+
+            const hands = new Hands({
+                locateFile: (file) =>
+                    `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
+            });
+
+            hands.setOptions({
+                maxNumHands: 1,
+                modelComplexity: 1,
+                minDetectionConfidence: 0.7,
+                minTrackingConfidence: 0.6,
+            });
+
+            hands.onResults(onHandResults);
+
+            // ══════════════════════════════════════════════════════════════
+            //  HAND TRACKING LOGIC
+            // ══════════════════════════════════════════════════════════════
+
+            function onHandResults(results) {
+                // ── FPS counter ──
+                frameCount++;
+                const now = performance.now();
+                if (now - lastFpsTime >= 1000) {
+                    document.getElementById('fpsBadge').textContent =
+                        frameCount + ' FPS';
+                    frameCount = 0;
+                    lastFpsTime = now;
+                }
+
+                // ── Draw overlay ──
+                canvasOverlay.width = canvasOverlay.offsetWidth;
+                canvasOverlay.height = canvasOverlay.offsetHeight;
+                ctx.clearRect(0, 0, canvasOverlay.width, canvasOverlay.height);
+
+                if (
+                    !results.multiHandLandmarks ||
+                    results.multiHandLandmarks.length === 0
+                ) {
+                    clearGestures();
+                    prevPalmX = null;
+                    prevPalmY = null;
+                    return;
+                }
+
+                const landmarks = results.multiHandLandmarks[0];
+                drawHand(landmarks);
+
+                if (!isTracking) return;
+
+                // ─── Landmark positions (normalized 0-1) ───
+                // Camera is mirrored, so we flip X
+                const thumb = landmarks[4]; // Thumb tip
+                const index = landmarks[8]; // Index finger tip
+                const middle = landmarks[12]; // Middle finger tip
+                const ring = landmarks[16]; // Ring finger tip
+
+                // Palm center = average of wrist + finger bases
+                const palmLandmarks = [
+                    landmarks[0],
+                    landmarks[5],
+                    landmarks[9],
+                    landmarks[13],
+                    landmarks[17],
+                ];
+                const palmX =
+                    palmLandmarks.reduce((s, l) => s + l.x, 0) /
+                    palmLandmarks.length;
+                const palmY =
+                    palmLandmarks.reduce((s, l) => s + l.y, 0) /
+                    palmLandmarks.length;
+
+                // ─── Convert palm to screen coordinates ───
+                // Camera is mirrored so invert X
+                const rawX = (1 - palmX) * screenW * sensitivity;
+                const rawY = palmY * screenH * sensitivity;
+
+                // Center the mapping (offset so the usable area is centered on screen)
+                const offsetX = (screenW * sensitivity - screenW) / 2;
+                const offsetY = (screenH * sensitivity - screenH) / 2;
+                const mappedX = rawX - offsetX;
+                const mappedY = rawY - offsetY;
+
+                // Smooth the cursor movement
+                const alpha = 1 / smoothingFactor;
+                smoothX = smoothX + alpha * (mappedX - smoothX);
+                smoothY = smoothY + alpha * (mappedY - smoothY);
+
+                // Clamp to screen
+                const finalX = Math.max(0, Math.min(screenW - 1, smoothX));
+                const finalY = Math.max(0, Math.min(screenH - 1, smoothY));
+
+                // ─── Calculate distances (in pixel-space of the video) ───
+                const vidW = canvasOverlay.width;
+                const vidH = canvasOverlay.height;
+
+                const distThumbIndex = dist(thumb, index, vidW, vidH);
+                const distThumbMiddle = dist(thumb, middle, vidW, vidH);
+                const distThumbRing = dist(thumb, ring, vidW, vidH);
+
+                // ─── Gesture: Scroll (Thumb + Ring) — must check FIRST ───
+                if (distThumbRing < pinchThreshold) {
+                    if (!isScrolling) {
+                        isScrolling = true;
+                        scrollBaseY = thumb.y;
+                        setGestureActive('gestureScroll', true);
+                        log('Scroll mode activated', 'accent');
+                    }
+                    // Calculate scroll delta based on thumb movement
+                    const scrollDelta = (thumb.y - scrollBaseY) * 800;
+                    if (Math.abs(scrollDelta) > 2) {
+                        window.mouseAPI.scroll(scrollDelta);
+                        scrollBaseY = thumb.y; // reset base for continuous scrolling
+                    }
+                } else {
+                    if (isScrolling) {
+                        isScrolling = false;
+                        setGestureActive('gestureScroll', false);
+                    }
+                }
+
+                // ─── Gesture: Left Click Hold (Thumb + Index) ───
+                if (!isScrolling) {
+                    if (distThumbIndex < pinchThreshold) {
+                        if (!isLeftDown) {
+                            isLeftDown = true;
+                            window.mouseAPI.leftDown();
+                            setGestureActive('gestureLeft', true);
+                            log('Left button DOWN', 'accent');
+                        }
+                    } else {
+                        if (isLeftDown) {
+                            isLeftDown = false;
+                            window.mouseAPI.leftUp();
+                            setGestureActive('gestureLeft', false);
+                            log('Left button UP', 'accent');
+                        }
+                    }
+
+                    // ─── Gesture: Right Click (Thumb + Middle) ───
+                    if (distThumbMiddle < pinchThreshold) {
+                        if (!rightClickCooldown && !isLeftDown) {
+                            rightClickCooldown = true;
+                            window.mouseAPI.rightClick();
+                            setGestureActive('gestureRight', true);
+                            log('Right click', 'accent');
+                            setTimeout(() => {
+                                rightClickCooldown = false;
+                                setGestureActive('gestureRight', false);
+                            }, 500);
+                        }
+                    }
+                }
+
+                // ─── Move cursor (always, unless scrolling) ───
+                if (!isScrolling) {
+                    window.mouseAPI.moveMouse(finalX, finalY);
+                    setGestureActive('gestureMove', true);
+                }
+            }
+
+            // ─── Distance helper (in pixel space) ───
+            function dist(a, b, w, h) {
+                const dx = (a.x - b.x) * w;
+                const dy = (a.y - b.y) * h;
+                return Math.sqrt(dx * dx + dy * dy);
+            }
+
+            // ─── Draw hand skeleton ───
+            function drawHand(landmarks) {
+                const w = canvasOverlay.width;
+                const h = canvasOverlay.height;
+
+                // Connections
+                const connections = [
+                    [0, 1],
+                    [1, 2],
+                    [2, 3],
+                    [3, 4], // thumb
+                    [0, 5],
+                    [5, 6],
+                    [6, 7],
+                    [7, 8], // index
+                    [0, 9],
+                    [9, 10],
+                    [10, 11],
+                    [11, 12], // middle (fixed: was 5,9)
+                    [0, 13],
+                    [13, 14],
+                    [14, 15],
+                    [15, 16], // ring (fixed: was 9,13)
+                    [0, 17],
+                    [17, 18],
+                    [18, 19],
+                    [19, 20], // pinky (fixed: was 13,17)
+                    [5, 9],
+                    [9, 13],
+                    [13, 17], // palm
+                ];
+
+                ctx.strokeStyle = 'rgba(0, 229, 160, 0.5)';
+                ctx.lineWidth = 2;
+                for (const [i, j] of connections) {
+                    const a = landmarks[i],
+                        b = landmarks[j];
+                    ctx.beginPath();
+                    // Mirror X for display
+                    ctx.moveTo((1 - a.x) * w, a.y * h);
+                    ctx.lineTo((1 - b.x) * w, b.y * h);
+                    ctx.stroke();
+                }
+
+                // Draw landmark dots
+                for (let i = 0; i < landmarks.length; i++) {
+                    const lm = landmarks[i];
+                    const x = (1 - lm.x) * w;
+                    const y = lm.y * h;
+
+                    ctx.beginPath();
+                    // Highlight fingertips
+                    const isTip = [4, 8, 12, 16, 20].includes(i);
+                    ctx.arc(x, y, isTip ? 5 : 3, 0, 2 * Math.PI);
+                    ctx.fillStyle = isTip
+                        ? '#00e5a0'
+                        : 'rgba(0, 229, 160, 0.6)';
+                    ctx.fill();
+                }
+
+                // Draw palm center
+                const palmLandmarks = [
+                    landmarks[0],
+                    landmarks[5],
+                    landmarks[9],
+                    landmarks[13],
+                    landmarks[17],
+                ];
+                const px =
+                    (palmLandmarks.reduce((s, l) => s + (1 - l.x), 0) /
+                        palmLandmarks.length) *
+                    w;
+                const py =
+                    (palmLandmarks.reduce((s, l) => s + l.y, 0) /
+                        palmLandmarks.length) *
+                    h;
+                ctx.beginPath();
+                ctx.arc(px, py, 8, 0, 2 * Math.PI);
+                ctx.fillStyle = 'rgba(0, 229, 160, 0.3)';
+                ctx.fill();
+                ctx.strokeStyle = '#00e5a0';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+
+            // ══════════════════════════════════════════════════════════════
+            //  UI HELPERS
+            // ══════════════════════════════════════════════════════════════
+
+            function setGestureActive(id, active) {
+                const el = document.getElementById(id);
+                if (el) el.classList.toggle('active', active);
+            }
+
+            function clearGestures() {
+                [
+                    'gestureMove',
+                    'gestureLeft',
+                    'gestureRight',
+                    'gestureScroll',
+                ].forEach((id) => setGestureActive(id, false));
+                // Release left button if hand disappears
+                if (isLeftDown) {
+                    isLeftDown = false;
+                    window.mouseAPI.leftUp();
+                }
+                if (isScrolling) {
+                    isScrolling = false;
+                }
+            }
+
+            function log(msg, type = '') {
+                const panel = document.getElementById('logPanel');
+                const div = document.createElement('div');
+                const time = new Date().toLocaleTimeString('en-US', {
+                    hour12: false,
+                });
+                div.innerHTML = `<span class="log-${type}">[${time}]</span> ${msg}`;
+                panel.appendChild(div);
+                panel.scrollTop = panel.scrollHeight;
+                // Keep log short
+                while (panel.children.length > 50)
+                    panel.removeChild(panel.firstChild);
+            }
+
+            function updateSetting(input) {
+                const val = parseFloat(input.value);
+                switch (input.id) {
+                    case 'sensitivity':
+                        sensitivity = val;
+                        document.getElementById('sensitivityVal').textContent =
+                            val.toFixed(1);
+                        break;
+                    case 'smoothing':
+                        smoothingFactor = val;
+                        document.getElementById('smoothingVal').textContent =
+                            val;
+                        break;
+                    case 'threshold':
+                        pinchThreshold = val;
+                        document.getElementById('thresholdVal').textContent =
+                            val;
+                        break;
+                }
+            }
+
+            // ══════════════════════════════════════════════════════════════
+            //  START / STOP
+            // ══════════════════════════════════════════════════════════════
+
+            async function toggleTracking() {
+                const btn = document.getElementById('toggleBtn');
+                const dot = document.getElementById('statusDot');
+                const recDot = document.getElementById('recDot');
+                const camStatus = document.getElementById('camStatus');
+
+                if (!isTracking) {
+                    // Start camera + tracking
+                    try {
+                        const stream =
+                            await navigator.mediaDevices.getUserMedia({
+                                video: {
+                                    width: 640,
+                                    height: 480,
+                                    facingMode: 'user',
+                                },
+                            });
+                        videoElement.srcObject = stream;
+
+                        camera = new Camera(videoElement, {
+                            onFrame: async () => {
+                                await hands.send({ image: videoElement });
+                            },
+                            width: 640,
+                            height: 480,
+                        });
+                        await camera.start();
+
+                        isTracking = true;
+                        btn.textContent = 'STOP';
+                        btn.classList.add('active');
+                        dot.classList.add('active');
+                        recDot.style.display = 'inline-block';
+                        camStatus.textContent = 'TRACKING';
+                        log('Tracking started — show your hand ✋', 'accent');
+                    } catch (err) {
+                        log('Camera error: ' + err.message, 'warn');
+                    }
+                } else {
+                    // Stop
+                    isTracking = false;
+                    if (camera) camera.stop();
+                    if (videoElement.srcObject) {
+                        videoElement.srcObject
+                            .getTracks()
+                            .forEach((t) => t.stop());
+                        videoElement.srcObject = null;
+                    }
+                    clearGestures();
+                    ctx.clearRect(
+                        0,
+                        0,
+                        canvasOverlay.width,
+                        canvasOverlay.height,
+                    );
+
+                    btn.textContent = 'START';
+                    btn.classList.remove('active');
+                    dot.classList.remove('active');
+                    recDot.style.display = 'none';
+                    camStatus.textContent = 'CAMERA OFF';
+                    log('Tracking stopped');
+                }
+            }
+
+            // ── Init ──
+            log('Waiting for user to start tracking...');
+        </script>
+    </body>
+</html>

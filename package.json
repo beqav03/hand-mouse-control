@@ -1,0 +1,32 @@
+{
+    "name": "hand-mouse-control",
+    "version": "1.0.0",
+    "description": "Control your mouse with hand gestures using your camera",
+    "main": "src/main.js",
+    "scripts": {
+        "start": "electron .",
+        "build": "electron-builder --win",
+        "pack": "electron-builder --win --dir"
+    },
+    "author": "HandMouse",
+    "license": "MIT",
+    "devDependencies": {
+        "electron": "^28.1.0",
+        "electron-builder": "^24.9.1"
+    },
+    "dependencies": {
+        "@nut-tree-fork/nut-js": "^4.2.2"
+    },
+    "build": {
+        "appId": "com.handmouse.control",
+        "productName": "Hand Mouse Control",
+        "win": {
+            "target": "nsis",
+            "icon": "assets/icon.png"
+        },
+        "files": [
+            "src/**/*",
+            "node_modules/**/*"
+        ]
+    }
+}
