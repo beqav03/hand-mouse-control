@@ -301,31 +301,31 @@
         <div class="status-panel">
             <div class="gesture-grid">
                 <div class="gesture-card" id="gestureMove">
-                    <span class="icon">🖐️</span>
+                    <span class="icon">👆</span>
                     <div class="info">
                         <span class="label">Move</span>
-                        <span class="desc">Palm tracking</span>
+                        <span class="desc">Left hand index</span>
                     </div>
                 </div>
                 <div class="gesture-card" id="gestureLeft">
-                    <span class="icon">👆</span>
+                    <span class="icon">🤏</span>
                     <div class="info">
                         <span class="label">Left Click</span>
-                        <span class="desc">Thumb + Index</span>
+                        <span class="desc">Right: Thumb + Index</span>
                     </div>
                 </div>
                 <div class="gesture-card" id="gestureRight">
                     <span class="icon">👌</span>
                     <div class="info">
                         <span class="label">Right Click</span>
-                        <span class="desc">Thumb + Middle</span>
+                        <span class="desc">Right: Thumb + Middle</span>
                     </div>
                 </div>
                 <div class="gesture-card" id="gestureScroll">
                     <span class="icon">📜</span>
                     <div class="info">
                         <span class="label">Scroll</span>
-                        <span class="desc">Thumb + Ring</span>
+                        <span class="desc">Right: Thumb + Ring</span>
                     </div>
                 </div>
             </div>
@@ -449,7 +449,7 @@
             });
 
             hands.setOptions({
-                maxNumHands: 1,
+                maxNumHands: 2,
                 modelComplexity: 1,
                 minDetectionConfidence: 0.7,
                 minTrackingConfidence: 0.6,
@@ -487,54 +487,79 @@
                     return;
                 }
 
-                const landmarks = results.multiHandLandmarks[0];
-                drawHand(landmarks);
+                // ─── Separate detected hands into Left / Right ───
+                // MediaPipe assumes a mirrored (selfie) input; since the raw
+                // camera feed is NOT mirrored here, we swap the reported label
+                // so "Left" corresponds to the user's actual left hand.
+                let leftHand = null;
+                let rightHand = null;
+                for (let i = 0; i < results.multiHandLandmarks.length; i++) {
+                    const lm = results.multiHandLandmarks[i];
+                    const reported =
+                        results.multiHandedness &&
+                        results.multiHandedness[i] &&
+                        results.multiHandedness[i].label;
+                    const label = reported === 'Left' ? 'Right' : 'Left';
+                    if (label === 'Left' && !leftHand) leftHand = lm;
+                    else if (label === 'Right' && !rightHand) rightHand = lm;
+                }
+
+                // Draw both hands
+                if (leftHand) drawHand(leftHand, '#00e5a0');
+                if (rightHand) drawHand(rightHand, '#ffaa00');
 
                 if (!isTracking) return;
 
-                // ─── Landmark positions (normalized 0-1) ───
-                // Camera is mirrored, so we flip X
-                const thumb = landmarks[4]; // Thumb tip
-                const index = landmarks[8]; // Index finger tip
-                const middle = landmarks[12]; // Middle finger tip
-                const ring = landmarks[16]; // Ring finger tip
+                // ══════════════════════════════════════════════════
+                //  LEFT HAND → cursor movement (index fingertip)
+                // ══════════════════════════════════════════════════
+                if (leftHand) {
+                    const indexTip = leftHand[8];
 
-                // Palm center = average of wrist + finger bases
-                const palmLandmarks = [
-                    landmarks[0],
-                    landmarks[5],
-                    landmarks[9],
-                    landmarks[13],
-                    landmarks[17],
-                ];
-                const palmX =
-                    palmLandmarks.reduce((s, l) => s + l.x, 0) /
-                    palmLandmarks.length;
-                const palmY =
-                    palmLandmarks.reduce((s, l) => s + l.y, 0) /
-                    palmLandmarks.length;
+                    // Camera is mirrored in display, so invert X
+                    const rawX = (1 - indexTip.x) * screenW * sensitivity;
+                    const rawY = indexTip.y * screenH * sensitivity;
 
-                // ─── Convert palm to screen coordinates ───
-                // Camera is mirrored so invert X
-                const rawX = (1 - palmX) * screenW * sensitivity;
-                const rawY = palmY * screenH * sensitivity;
+                    const offsetX = (screenW * sensitivity - screenW) / 2;
+                    const offsetY = (screenH * sensitivity - screenH) / 2;
+                    const mappedX = rawX - offsetX;
+                    const mappedY = rawY - offsetY;
 
-                // Center the mapping (offset so the usable area is centered on screen)
-                const offsetX = (screenW * sensitivity - screenW) / 2;
-                const offsetY = (screenH * sensitivity - screenH) / 2;
-                const mappedX = rawX - offsetX;
-                const mappedY = rawY - offsetY;
+                    const alpha = 1 / smoothingFactor;
+                    smoothX = smoothX + alpha * (mappedX - smoothX);
+                    smoothY = smoothY + alpha * (mappedY - smoothY);
 
-                // Smooth the cursor movement
-                const alpha = 1 / smoothingFactor;
-                smoothX = smoothX + alpha * (mappedX - smoothX);
-                smoothY = smoothY + alpha * (mappedY - smoothY);
+                    const finalX = Math.max(0, Math.min(screenW - 1, smoothX));
+                    const finalY = Math.max(0, Math.min(screenH - 1, smoothY));
 
-                // Clamp to screen
-                const finalX = Math.max(0, Math.min(screenW - 1, smoothX));
-                const finalY = Math.max(0, Math.min(screenH - 1, smoothY));
+                    window.mouseAPI.moveMouse(finalX, finalY);
+                    setGestureActive('gestureMove', true);
+                } else {
+                    setGestureActive('gestureMove', false);
+                }
 
-                // ─── Calculate distances (in pixel-space of the video) ───
+                // ══════════════════════════════════════════════════
+                //  RIGHT HAND → click / right-click / scroll
+                // ══════════════════════════════════════════════════
+                if (!rightHand) {
+                    // Release any stuck buttons if right hand disappears
+                    if (isLeftDown) {
+                        isLeftDown = false;
+                        window.mouseAPI.leftUp();
+                        setGestureActive('gestureLeft', false);
+                    }
+                    if (isScrolling) {
+                        isScrolling = false;
+                        setGestureActive('gestureScroll', false);
+                    }
+                    return;
+                }
+
+                const thumb = rightHand[4];
+                const index = rightHand[8];
+                const middle = rightHand[12];
+                const ring = rightHand[16];
+
                 const vidW = canvasOverlay.width;
                 const vidH = canvasOverlay.height;
 
@@ -550,11 +575,10 @@
                         setGestureActive('gestureScroll', true);
                         log('Scroll mode activated', 'accent');
                     }
-                    // Calculate scroll delta based on thumb movement
                     const scrollDelta = (thumb.y - scrollBaseY) * 800;
                     if (Math.abs(scrollDelta) > 2) {
                         window.mouseAPI.scroll(scrollDelta);
-                        scrollBaseY = thumb.y; // reset base for continuous scrolling
+                        scrollBaseY = thumb.y;
                     }
                 } else {
                     if (isScrolling) {
@@ -595,12 +619,6 @@
                         }
                     }
                 }
-
-                // ─── Move cursor (always, unless scrolling) ───
-                if (!isScrolling) {
-                    window.mouseAPI.moveMouse(finalX, finalY);
-                    setGestureActive('gestureMove', true);
-                }
             }
 
             // ─── Distance helper (in pixel space) ───
@@ -611,9 +629,11 @@
             }
 
             // ─── Draw hand skeleton ───
-            function drawHand(landmarks) {
+            function drawHand(landmarks, color = '#00e5a0') {
                 const w = canvasOverlay.width;
                 const h = canvasOverlay.height;
+
+                const rgba = (c, a) => hexToRgba(c, a);
 
                 // Connections
                 const connections = [
@@ -628,21 +648,21 @@
                     [0, 9],
                     [9, 10],
                     [10, 11],
-                    [11, 12], // middle (fixed: was 5,9)
+                    [11, 12], // middle
                     [0, 13],
                     [13, 14],
                     [14, 15],
-                    [15, 16], // ring (fixed: was 9,13)
+                    [15, 16], // ring
                     [0, 17],
                     [17, 18],
                     [18, 19],
-                    [19, 20], // pinky (fixed: was 13,17)
+                    [19, 20], // pinky
                     [5, 9],
                     [9, 13],
                     [13, 17], // palm
                 ];
 
-                ctx.strokeStyle = 'rgba(0, 229, 160, 0.5)';
+                ctx.strokeStyle = rgba(color, 0.5);
                 ctx.lineWidth = 2;
                 for (const [i, j] of connections) {
                     const a = landmarks[i],
@@ -661,12 +681,9 @@
                     const y = lm.y * h;
 
                     ctx.beginPath();
-                    // Highlight fingertips
                     const isTip = [4, 8, 12, 16, 20].includes(i);
                     ctx.arc(x, y, isTip ? 5 : 3, 0, 2 * Math.PI);
-                    ctx.fillStyle = isTip
-                        ? '#00e5a0'
-                        : 'rgba(0, 229, 160, 0.6)';
+                    ctx.fillStyle = isTip ? color : rgba(color, 0.6);
                     ctx.fill();
                 }
 
@@ -688,11 +705,19 @@
                     h;
                 ctx.beginPath();
                 ctx.arc(px, py, 8, 0, 2 * Math.PI);
-                ctx.fillStyle = 'rgba(0, 229, 160, 0.3)';
+                ctx.fillStyle = rgba(color, 0.3);
                 ctx.fill();
-                ctx.strokeStyle = '#00e5a0';
+                ctx.strokeStyle = color;
                 ctx.lineWidth = 2;
                 ctx.stroke();
+            }
+
+            function hexToRgba(hex, alpha) {
+                const h = hex.replace('#', '');
+                const r = parseInt(h.substring(0, 2), 16);
+                const g = parseInt(h.substring(2, 4), 16);
+                const b = parseInt(h.substring(4, 6), 16);
+                return `rgba(${r}, ${g}, ${b}, ${alpha})`;
             }
 
             // ══════════════════════════════════════════════════════════════
