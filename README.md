@@ -4,12 +4,14 @@ A Windows desktop app that lets you control your mouse with hand gestures using 
 
 ## Gestures
 
-| Gesture                         | Action                                      |
-| ------------------------------- | ------------------------------------------- |
-| **Open palm**                   | Move cursor (follows palm center)           |
-| **Thumb + Index finger pinch**  | Left click & hold (release = release click) |
-| **Thumb + Middle finger pinch** | Right click                                 |
-| **Thumb + Ring finger pinch**   | Scroll mode (move hand up/down to scroll)   |
+The app uses **two hands**: your left hand moves the cursor, your right hand performs clicks and scrolling.
+
+| Hand      | Gesture                         | Action                                      |
+| --------- | ------------------------------- | ------------------------------------------- |
+| **Left**  | Index finger                    | Move cursor (follows index fingertip)       |
+| **Right** | Thumb + Index finger pinch      | Left click & hold (release = release click) |
+| **Right** | Thumb + Middle finger pinch     | Right click                                 |
+| **Right** | Thumb + Ring finger pinch       | Scroll mode (move hand up/down to scroll)   |
 
 ---
 
@@ -56,11 +58,11 @@ npm start
 ### 4. Using the app
 
 1. Click **START** to enable the camera and hand tracking
-2. Show your hand to the camera
-3. Move your palm to move the cursor
-4. Pinch thumb + index finger to left-click (hold)
-5. Pinch thumb + middle finger to right-click
-6. Pinch thumb + ring finger and move up/down to scroll
+2. Show both hands to the camera
+3. Point with your **left** index finger to move the cursor
+4. Pinch **right** thumb + index finger to left-click (hold)
+5. Pinch **right** thumb + middle finger to right-click
+6. Pinch **right** thumb + ring finger and move up/down to scroll
 
 ### 5. Build a Windows installer (optional)
 
