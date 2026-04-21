@@ -1,0 +1,29 @@
+{
+    "root": true,
+    "env": { "es2022": true },
+    "parserOptions": { "ecmaVersion": 2022, "sourceType": "script" },
+    "extends": ["eslint:recommended"],
+    "rules": {
+        "no-empty": ["error", { "allowEmptyCatch": true }],
+        "no-unused-vars": [
+            "warn",
+            { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }
+        ]
+    },
+    "ignorePatterns": ["src/vendor/**"],
+    "overrides": [
+        {
+            "files": ["src/main.js", "src/preload.js", "scripts/**/*.js"],
+            "env": { "node": true, "browser": false }
+        },
+        {
+            "files": ["src/renderer.js"],
+            "env": { "browser": true, "node": false },
+            "globals": {
+                "mouseAPI": "readonly",
+                "Hands": "readonly",
+                "Camera": "readonly"
+            }
+        }
+    ]
+}
