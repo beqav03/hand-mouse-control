@@ -1,4 +1,4 @@
-// ─── preload.js ─── Secure bridge between renderer and main process ───
+// preload.js — context-isolated bridge between renderer and main.
 
 const { contextBridge, ipcRenderer } = require('electron');
 
@@ -10,5 +10,9 @@ contextBridge.exposeInMainWorld('mouseAPI', {
     scroll: (deltaY) => ipcRenderer.send('mouse-scroll', { deltaY }),
     getScreenSize: () => ipcRenderer.invoke('get-screen-size'),
     onScreenSize: (callback) =>
-        ipcRenderer.on('screen-size', (event, data) => callback(data)),
+        ipcRenderer.on('screen-size', (_e, data) => callback(data)),
+    onToggleTracking: (callback) =>
+        ipcRenderer.on('toggle-tracking', () => callback()),
+    onForceStop: (callback) =>
+        ipcRenderer.on('force-stop', () => callback()),
 });
